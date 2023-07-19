@@ -61,7 +61,7 @@ def build_2d_first_order_grad(M, N, boundary="none"):
 
     full_diff_mat = sps.vstack([d_mat_one, d_mat_two])
     
-    return full_diff_mat
+    return d_mat_one, d_mat_two
 
 
 
