@@ -1,7 +1,8 @@
 import numpy as np
+from scipy.sparse.linalg import aslinearoperator
+
 from .util import wrap_function, build_1d_first_order_grad, upsampling_matrix
 from .cg import relative_residual_cg
-
 
 def mle_1d(psi, weights=None):
     """Given a 1D wrapped phase vector psi, computes the MLE estimator corresponding to the D2 data fidelity term.
@@ -48,7 +49,7 @@ def mle_1d(psi, weights=None):
 
 
 
-def mle_2d(psi, Fx, Fy, weights=None, solve_method="iterative", cg_tol=1e-4, cg_maxits=None):
+def mle_2d(psi, Fx, Fy, weights=None, solve_method="iterative", cg_tol=1e-4, cg_maxits=None, cg_x0=None):
 
     valid_methods = ["iterative", "direct"]
     assert solve_method in valid_methods, f"invalid solve method, must be in {valid_methods}"
@@ -76,12 +77,14 @@ def mle_2d(psi, Fx, Fy, weights=None, solve_method="iterative", cg_tol=1e-4, cg_
 
     # Q matrix
     Q = P.T @ Fx.T @ np.diag(weights) @ Fx @ P  + P.T @ Fy.T @ np.diag(weights) @ Fy @ P
+   
 
     # Solve system for answer
     if solve_method == "direct":
-        phi2 = np.linalg.solve(Q, rhs)
+        phi2 = np.linalg.solve(Q, rhs) # O(N^3)
     elif solve_method == "iterative":
-        phi2 = relative_residual_cg(Q, rhs, eps=cg_tol, maxits=cg_maxits)
+        Q = aslinearoperator(Q)
+        phi2 = relative_residual_cg(Q, rhs, eps=cg_tol, maxits=cg_maxits, x0=cg_x0) # conjugate gradient O(\kappa N)
         phi2 = phi2["x"]
 
     # Append first entry
