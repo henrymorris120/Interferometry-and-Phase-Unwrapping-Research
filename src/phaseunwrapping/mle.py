@@ -48,7 +48,7 @@ def mle_1d(psi, weights=None):
 
 
 
-def solve_D2_MLE_2D(psi, Fx, Fy, weights=None, solve_method="iterative", cg_tol=1e-4, cg_maxits=None):
+def mle_2d(psi, Fx, Fy, weights=None, solve_method="iterative", cg_tol=1e-4, cg_maxits=None):
 
     valid_methods = ["iterative", "direct"]
     assert solve_method in valid_methods, f"invalid solve method, must be in {valid_methods}"
