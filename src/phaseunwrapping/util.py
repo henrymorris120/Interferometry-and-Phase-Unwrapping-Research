@@ -1,6 +1,10 @@
 import numpy as np
 import scipy.sparse as sps
 
+import scipy.sparse as scipy_sparse
+from scipy.sparse import linalg as scipy_splinalg
+from scipy.sparse import csc_matrix
+
 
 def wrap_function(phi):
     """Computes the wrap function elementwise for the input array.
@@ -10,11 +14,52 @@ def wrap_function(phi):
 
 
 
-def upsampling_matrix(n):
-    # Constructing the upsampling matrix
-    P = np.zeros((n+1, n))
-    P[1:, :] = np.eye(n)
-    return P
+def upsampling_matrix(n, sparse=False):
+    """Constructing the upsampling matrix.
+    """
+
+    if not sparse:
+        P = np.zeros((n+1, n))
+        P[1:, :] = np.eye(n)
+        return P
+    else:
+        P = csc_matrix((n+1,n))
+        P.setdiag(1,k=-1)
+        return P
+
+        
+
+
+def banded_cholesky_factor(A, check=False):
+    """
+    Given a sparse banded matrix (SciPy or CuPy) :math:`A`, returns the Cholesky factor :math:`L` in the factorizations
+    :math:`A = L L^T` with :math:`L` lower-triangular. Here :math:`A` must be a positive definite matrix.
+    """
+
+    xp = np
+    sp = scipy_sparse
+    splinalg = scipy_splinalg
+    
+    # Shape
+    n = A.shape[0]
+    
+    # Sparse LU
+    LU = splinalg.splu(A, diag_pivot_thresh=0, permc_spec="NATURAL") 
+
+    # Check for positive-definiteness
+    posdef_check = ( LU.perm_r == xp.arange(n) ).all() and ( LU.U.diagonal() > 0 ).all()
+    assert posdef_check, "Matrix not positive definite!"
+    
+    # Extract factor
+    L = LU.L.dot( sp.diags(LU.U.diagonal()**0.5) )
+    
+    # Check?
+    if check:
+        guess = L @ L.T
+        norm_error = xp.linalg.norm( guess.toarray() - A.toarray() )
+        print(f"L2 norm between L L^T and A: {norm_error}")
+    
+    return L, LU
 
 
 
