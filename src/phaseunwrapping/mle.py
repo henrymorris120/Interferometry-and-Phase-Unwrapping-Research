@@ -80,7 +80,7 @@ def mle_2d_banded_cholesky(psi, weights=None):
     rhs = P.T @ Fx.T @ Dweights @ ( wrap_function(Fx @ psi_flatten) - (Fx @ phi1) ) + P.T @ Fy.T @ Dweights @ ( wrap_function(Fy @ psi_flatten) - (Fy @ phi1) )
 
     # Q matrix
-    Q = P.T @ Fx.T @ np.diag(weights) @ Fx @ P  + P.T @ Fy.T @ np.diag(weights) @ Fy @ P
+    Q = P.T @ Fx.T @ Dweights @ Fx @ P  + P.T @ Fy.T @ Dweights @ Fy @ P
 
     # banded cholesky
     L, superlu = banded_cholesky_factor(Q)
@@ -99,16 +99,22 @@ def mle_2d_banded_cholesky(psi, weights=None):
     
 
 
-def mle_2d(psi, Fx, Fy, weights=None, solve_method="iterative", cg_tol=1e-4, cg_maxits=None, cg_x0=None):
+def mle_2d(psi, weights=None, solve_method="iterative", cg_tol=1e-4, cg_maxits=None, cg_x0=None):
 
     valid_methods = ["iterative", "direct"]
     assert solve_method in valid_methods, f"invalid solve method, must be in {valid_methods}"
 
-    if solve_method == "iterative":
-        cg_maxits = Fx.shape[1]
+    M, N = psi.shape
 
     # Get flattened version of psi
     psi_flatten = psi.flatten()
+
+    # Gradient ops
+    print("Building grad ops")
+    Fx, Fy = build_2d_first_order_grad(M, N, boundary="none")
+
+    if solve_method == "iterative":
+        cg_maxits = Fx.shape[1]
 
     # Set initial weights
     #might have to adjust this code if we are not looking at N by N image
@@ -117,26 +123,32 @@ def mle_2d(psi, Fx, Fy, weights=None, solve_method="iterative", cg_tol=1e-4, cg_
     else:
         assert len(weights) == len(psi), "psi and weight vector must have same length!"
     
-    P = upsampling_matrix(len(psi_flatten) - 1)
+    print("building P")
+    P = upsampling_matrix(len(psi_flatten) - 1, sparse=True)
     
     phi1 = np.zeros(len(psi_flatten))
     phi1[0] = psi_flatten[0]
+
+    Dweights = sps.diags(weights)
    
     # rhs vector
-    rhs = P.T @ Fx.T @ np.diag(weights) @ ( wrap_function(Fx @ psi_flatten) - (Fx @ phi1) ) + P.T @ Fy.T @ np.diag(weights) @ ( wrap_function(Fy @ psi_flatten) - (Fy @ phi1) )
+    print("building rhs")
+    rhs = P.T @ (Fx.T @ ( Dweights @ ( wrap_function(Fx @ psi_flatten) - (Fx @ phi1) ) ) ) + P.T @ ( Fy.T @ ( Dweights @ ( wrap_function(Fy @ psi_flatten) - (Fy @ phi1) ) ) )
 
     # Q matrix
-    Q = P.T @ Fx.T @ np.diag(weights) @ Fx @ P  + P.T @ Fy.T @ np.diag(weights) @ Fy @ P
+    print("building Q")
+    Q = aslinearoperator(P.T) @ aslinearoperator(Fx.T) @ aslinearoperator(Dweights) @ aslinearoperator(Fx) @ aslinearoperator(P)  + aslinearoperator(P.T) @ aslinearoperator(Fy.T) @ aslinearoperator(Dweights) @ aslinearoperator(Fy) @ aslinearoperator(P)
    
-
+    print("starting solve")
     # Solve system for answer
     if solve_method == "direct":
         phi2 = np.linalg.solve(Q, rhs) # O(N^3)
     elif solve_method == "iterative":
         Q = aslinearoperator(Q)
         phi2 = relative_residual_cg(Q, rhs, eps=cg_tol, maxits=cg_maxits, x0=cg_x0) # conjugate gradient O(\kappa N)
+        print(phi2["iterations"])
         phi2 = phi2["x"]
-
+        
     # Append first entry
     reconstructed_phi = np.zeros(len(psi_flatten))
     reconstructed_phi[1:] = phi2

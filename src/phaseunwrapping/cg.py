@@ -39,12 +39,16 @@ def relative_residual_cg(A, b, x0=None, eps=1e-8, maxits=1000):
         if rel_residual_norm < eps: 
             converged = True
             break
+        
+    if not converged:
+        print("CG did not satisfy stopping criterion at termination...")
 
-    assert converged, "CG didn't converge in less than maxits iterations!"
+    #assert converged, "CG didn't converge in less than maxits iterations!"
         
     data = {
         "x": x,
         "iterations": its,
+        "converged": converged,
     }
     
     return data

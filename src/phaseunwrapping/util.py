@@ -3,7 +3,7 @@ import scipy.sparse as sps
 
 import scipy.sparse as scipy_sparse
 from scipy.sparse import linalg as scipy_splinalg
-from scipy.sparse import csc_matrix
+from scipy.sparse import csc_matrix, lil_matrix
 
 
 def wrap_function(phi):
@@ -23,7 +23,9 @@ def upsampling_matrix(n, sparse=False):
         P[1:, :] = np.eye(n)
         return P
     else:
-        P = csc_matrix((n+1,n))
+        P = sps.diags(np.zeros(n+1))
+        P = P[:,-1]
+        #P = lil_matrix((n+1,n))
         P.setdiag(1,k=-1)
         return P
 
