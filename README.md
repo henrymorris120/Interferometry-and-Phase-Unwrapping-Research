@@ -1,4 +1,2 @@
 # phase-unwrapping
-A repo for phase unwrapping.
-
-This is a test.
+Research work done together with Jonathon Lindbloon on phase retrieval
